@@ -1,17 +1,20 @@
-import express from 'express';
+import express from "express";
 
-import globalErrorHandler from './middlewares/globalErrorHandler';
+import globalErrorHandler from "./middlewares/globalErrorHandler";
+import userRouter from "./users/userRouter";
 
 const app = express();
+app.use(express.json());
 
-//#region Routes
+// Routes
 //Http methods: GET, POST, PUT, PATCH, DELETE
-app.get('/', (req, res, next) => {
-    res.json({message: "Welcome to elib apis"})
+app.get("/", (req, res, next) => {
+  res.json({ message: "Welcome to elib apis" });
+});
 
-})
+app.use("/api/users", userRouter);
 
-//#region Global error handler
-    app.use(globalErrorHandler);
+// Global error handler
+app.use(globalErrorHandler);
 
 export default app;
