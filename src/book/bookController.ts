@@ -7,25 +7,34 @@ import bookModel from "./bookModel";
 import { AuthRequest } from "../middlewares/authenticate";
 
 const createBook = async (req: Request, res: Response, next: NextFunction) => {
-  const { title, genre } = req.body;
-
-  // upload coverImage in Cloudinary using multer
-  const files = req.files as { [fieldname: string]: Express.Multer.File[] }; // for type in the typeScript for file data from milter.
-  // MimeTypeArray = application/pdf
-  const coverImageMimeType = files.coverImage[0].mimetype.split("/").at(-1);
-  const fileName = files.coverImage[0].filename;
-  const filePath = path.resolve(
-    __dirname,
-    "../../public/data/uploads",
-    fileName
-  );
-
   try {
+    const { title, genre } = req.body;
+
+    // upload coverImage in Cloudinary using multer
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] }; // for type in the typeScript for file data from milter.
+
+    if (!files.coverImage || files.coverImage.length === 0) {
+      return next(createHttpError(400, "Cover image is required."));
+    }
+
+    // MimeTypeArray = application/pdf
+    const coverImageMimeType = files.coverImage[0].mimetype.split("/").at(-1);
+    const fileName = files.coverImage[0].filename;
+    const filePath = path.resolve(
+      __dirname,
+      "../../public/data/uploads",
+      fileName
+    );
+
     const uploadResult = await cloudinary.uploader.upload(filePath, {
       filename_override: fileName,
       folder: "book-covers",
       format: coverImageMimeType,
     });
+
+    if (!files.file || files.file.length === 0) {
+      return next(createHttpError(400, "Book file is required."));
+    }
 
     // upload book in Cloudinary using multer
     const bookFileName = files.file[0].filename;
@@ -152,8 +161,33 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
 
     res.json(updateBook);
   } catch (err) {
-    next(err);
+    return next(createHttpError(500, "Error while updating Recordes."));
   }
 };
 
-export { createBook, updateBook };
+const ListBooks = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // todo add pagination.
+    const book = await bookModel.find();
+    res.json(book);
+  } catch (err) {
+    return next(createHttpError(500, "Error while getting a book."));
+  }
+};
+
+const getSingleBook = async (req: Request, res: Response, next: NextFunction) => {
+  const bookId = req.params.bookId;
+
+  try{
+    const book = await bookModel.findOne({ _id: bookId });
+
+    if (!book) {
+      return next(createHttpError(404, "Book not found."));
+    }
+    return res.json(book);
+  }catch(err) {
+    return next(createHttpError(500, "Error while getting a book."));
+  }
+}
+
+export { createBook, updateBook, ListBooks, getSingleBook };
