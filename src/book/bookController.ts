@@ -6,17 +6,26 @@ import createHttpError from "http-errors";
 import bookModel from "./bookModel";
 import { AuthRequest } from "../middlewares/authenticate";
 
+//#region Create Book
+/**
+ * Controller function to create a new book.
+ * Handles file uploads for cover image and book file, uploads them to Cloudinary,
+ * and saves the book details in the database.
+ * 
+ * @param {Request} req - Express request object, contains book details and files.
+ * @param {Response} res - Express response object, used to send responses.
+ * @param {NextFunction} next - Express next middleware function, used for error handling.
+ */
 const createBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, genre } = req.body;
-
-    // upload coverImage in Cloudinary using multer
+    const { title, genre, description } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] }; // for type in the typeScript for file data from milter.
 
+    // Ensure cover image is provided
     if (!files.coverImage || files.coverImage.length === 0) {
       return next(createHttpError(400, "Cover image is required."));
     }
-
+    // Get cover image details
     // MimeTypeArray = application/pdf
     const coverImageMimeType = files.coverImage[0].mimetype.split("/").at(-1);
     const fileName = files.coverImage[0].filename;
@@ -26,17 +35,19 @@ const createBook = async (req: Request, res: Response, next: NextFunction) => {
       fileName
     );
 
+    // Upload cover image to Cloudinary
     const uploadResult = await cloudinary.uploader.upload(filePath, {
       filename_override: fileName,
       folder: "book-covers",
       format: coverImageMimeType,
     });
 
+    // Ensure book file is provided
     if (!files.file || files.file.length === 0) {
       return next(createHttpError(400, "Book file is required."));
     }
 
-    // upload book in Cloudinary using multer
+    // Get book file details
     const bookFileName = files.file[0].filename;
     const bookFilePath = path.resolve(
       __dirname,
@@ -44,6 +55,7 @@ const createBook = async (req: Request, res: Response, next: NextFunction) => {
       bookFileName
     );
 
+    // Upload book file to Cloudinary
     const bookFileUploaderResult = await cloudinary.uploader.upload(
       bookFilePath,
       {
@@ -63,15 +75,17 @@ const createBook = async (req: Request, res: Response, next: NextFunction) => {
 
     const _req = req as AuthRequest;
 
+    // Create new book record in database
     const newBook = await bookModel.create({
       title,
+      description,
       genre,
       author: _req.userId,
       coverImage: uploadResult.secure_url,
       file: bookFileUploaderResult.secure_url,
     });
 
-    // Delete temp files.
+    // Delete temporary files from server
     await fs.promises.unlink(filePath);
     await fs.promises.unlink(bookFilePath);
 
@@ -82,24 +96,33 @@ const createBook = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+//#region Update Book
+/**
+ * Controller function to update an existing book.
+ * Handles file uploads for updated cover image and book file, uploads them to Cloudinary,
+ * and updates the book details in the database.
+ * 
+ * @param {Request} req - Express request object, contains updated book details and files.
+ * @param {Response} res - Express response object, used to send responses.
+ * @param {NextFunction} next - Express next middleware function, used for error handling.
+ */
 const updateBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { title, genre } = req.body;
+    const { title, genre, description } = req.body;
     const bookId = req.params.bookId;
 
+    // Find book by ID
     const book = await bookModel.findOne({ _id: bookId });
 
     if (!book) {
       return next(createHttpError(404, "Book not found."));
     }
 
-    // Check access
     const _req = req as AuthRequest;
     if (book.author.toString() !== _req.userId) {
       return next(createHttpError(403, "You cannot update another's book."));
     }
 
-    // Get Cloudinary Public Ids
     const coverFileSplits = book.coverImage.split("/");
     const coverImagePublicId =
       coverFileSplits.at(-2) + "/" + coverFileSplits.at(-1)?.split(".").at(-2);
@@ -112,7 +135,7 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
     let completeCoverImage = book.coverImage;
     let completeFileName = book.file;
 
-    // Upload new cover image if provided and delete old one
+    // Handle cover image update
     if (files && files.coverImage) {
       const filename = files.coverImage[0].filename;
       const coverMimeType = files.coverImage[0].mimetype.split("/").at(-1);
@@ -126,7 +149,7 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
       if (coverImagePublicId) {
         await cloudinary.uploader.destroy(coverImagePublicId);
       }
-
+      // Upload new cover image to Cloudinary
       const uploadResult = await cloudinary.uploader.upload(filePath, {
         filename_override: filename,
         folder: "book-covers",
@@ -137,7 +160,7 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
       await fs.promises.unlink(filePath);
     }
 
-    // Upload new book file if provided and delete old one
+    // Handle book file update
     if (files && files.file) {
       const bookFilePath = path.resolve(
         __dirname,
@@ -153,6 +176,7 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
         });
       }
 
+      // Upload new book file to Cloudinary
       const uploadResultPdf = await cloudinary.uploader.upload(bookFilePath, {
         resource_type: "raw",
         filename_override: bookFileName,
@@ -164,11 +188,13 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
       await fs.promises.unlink(bookFilePath);
     }
 
+    // Update book record in database
     const updatedBook = await bookModel.findOneAndUpdate(
       { _id: bookId },
       {
         title,
         genre,
+        description,
         coverImage: completeCoverImage,
         file: completeFileName,
       },
@@ -181,9 +207,17 @@ const updateBook = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+//#region List Of All Books
+/**
+ * Controller function to list all books.
+ * Retrieves all books from the database and sends them in the response.
+ * 
+ * @param {Request} req - Express request object.
+ * @param {Response} res - Express response object, used to send responses.
+ * @param {NextFunction} next - Express next middleware function, used for error handling.
+ */
 const ListBooks = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // todo add pagination.
     const book = await bookModel.find();
     res.json(book);
   } catch (err) {
@@ -191,6 +225,15 @@ const ListBooks = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+//#region Get A single Book
+/**
+ * Controller function to get a single book by ID.
+ * Retrieves the book from the database and sends it in the response.
+ * 
+ * @param {Request} req - Express request object, contains book ID in params.
+ * @param {Response} res - Express response object, used to send responses.
+ * @param {NextFunction} next - Express next middleware function, used for error handling.
+ */
 const getSingleBook = async (
   req: Request,
   res: Response,
@@ -210,6 +253,15 @@ const getSingleBook = async (
   }
 };
 
+//#region Delete Book.
+/**
+ * Controller function to delete a book by ID.
+ * Deletes the book record from the database and removes associated files from Cloudinary.
+ * 
+ * @param {Request} req - Express request object, contains book ID in params.
+ * @param {Response} res - Express response object, used to send responses.
+ * @param {NextFunction} next - Express next middleware function, used for error handling.
+ */
 const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const bookId = req.params.bookId;
@@ -220,13 +272,10 @@ const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
       return next(createHttpError(404, "Book not found."));
     }
 
-    // check access
     const _req = req as AuthRequest;
     if (book.author.toString() !== _req.userId) {
       return next(createHttpError(403, "You can not update other book."));
     }
-
-    // get cloudinary Public Id :- book-cover/dghynghbtjyj
 
     const coverFileSpltes = book.coverImage.split("/");
     const coverImagePublicId =
@@ -250,7 +299,7 @@ const deleteBook = async (req: Request, res: Response, next: NextFunction) => {
       );
     }
 
-    // Delete the book record from the database
+
     try {
       await bookModel.deleteOne({ _id: bookId });
     } catch (dbError) {

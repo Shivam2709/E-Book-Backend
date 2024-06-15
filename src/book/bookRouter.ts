@@ -1,6 +1,12 @@
 import path from "node:path";
 import express from "express";
-import { ListBooks, createBook, deleteBook, getSingleBook, updateBook } from "./bookController";
+import {
+  ListBooks,
+  createBook,
+  deleteBook,
+  getSingleBook,
+  updateBook,
+} from "./bookController";
 import multer from "multer";
 import authenticate from "../middlewares/authenticate";
 
@@ -13,6 +19,7 @@ const upload = multer({
 });
 
 // Routes
+// /api/books
 bookRouter.post(
   "/",
   authenticate,
@@ -35,5 +42,5 @@ bookRouter.patch(
 
 bookRouter.get("/", ListBooks);
 bookRouter.get("/:bookId", getSingleBook);
-bookRouter.delete("/:bookId", authenticate, deleteBook)
+bookRouter.delete("/:bookId", authenticate, deleteBook);
 export default bookRouter;

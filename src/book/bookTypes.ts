@@ -1,6 +1,7 @@
 export interface Book {
     _id: String;
     title: String;
+    description: String;
     author: String;
     genre: String;
     coverImage: string;
