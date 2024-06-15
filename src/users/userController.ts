@@ -6,6 +6,7 @@ import { sign } from "jsonwebtoken";
 import { config } from "../config/config";
 import { User } from "./userTypes";
 
+//#region Use Registration.
 const createUser = async (req: Request, res: Response, next: NextFunction) => {
   const { name, email, password } = req.body;
 
@@ -57,6 +58,7 @@ const createUser = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+//#region User Login 
 const loginUser = async (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = req.body;
 
