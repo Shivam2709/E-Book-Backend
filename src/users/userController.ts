@@ -90,7 +90,7 @@ const loginUser = async (req: Request, res: Response, next: NextFunction) => {
       algorithm: "HS256",
     });
 
-    res.status(201).json({ accessToken: token });
+    res.status(201).json({ accessToken: token , user : user.name });
   } catch (err) {
     return next(createHttpError(500, "Error while signing the jwt token."));
   }

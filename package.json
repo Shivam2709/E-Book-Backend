@@ -4,7 +4,8 @@
   "description": "This is a ebook Api Project",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon server.ts"
+    "dev": "nodemon server.ts",
+    "build": "tsc"
   },
   "author": "",
   "license": "ISC",
